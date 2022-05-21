@@ -1,0 +1,38 @@
+- hosts: localhost
+  gather_facts: false
+
+  tasks:
+
+  - setup:
+      gather_subset:
+        - min
+
+  - name: get config from git
+    git:
+      repo: git@github.com:pewo/lab.git
+      dest: /etc/lab
+    register: repo
+
+  - debug: var=repo
+
+  - meta: end_play
+
+    #ansible_facts.fqdn
+#  - debug: var=ansible_facts.fqdn
+
+  - name: Optionally, at the same time specify IPv6 addresses for the device
+    community.general.nmcli:
+      conn_name: ens19
+      ifname: ens19
+      type: ethernet
+      ip4: 10.0.0.128/24
+      #gw4: 192.0.2.1
+      state: present
+    register: net
+
+
+  - block:
+
+    - debug: var=net
+
+    when: net.changed is defined and net.changed == true
