@@ -85,38 +85,6 @@
     when: ansible_facts.default_ipv4.interface == interface
 
   #
-  # Routing
-  #
-  - block:
-
-    - name: "Validate routing {{ routing }} is valid"
-      fail: 
-        msg: "The routing {{ routing  }} is not valid"
-      when: not ( routing | regex_search('^[0-9]+.[0-9]+.[0-9]+.[0-9]+\\/[0-9]+ +[0-9]+.[0-9]+.[0-9]+.[0-9]+$') )
-
-    - name: "Validate routing {{ routing }} not overwriting default router"
-      fail: 
-        msg: "The routing {{ routing  }} is not valid"
-      when: ( routing | regex_search('^0.0.0.0') )
-
-    - name: Define destination network and router
-      set_fact:
-         remote_network: "{{ routing.split(' ')[0] }}"
-         remote_router:  "{{ routing.split(' ')[1] }}"
-         iproutefile: "/etc/sysconfig/network-scripts/route-{{ interface }}"
-
-    - name: "Update ip route file {{ iproutefile }}"
-      copy:
-        dest: "{{ iproutefile }}"
-        content: "{{ remote_network }} via {{ remote_router }}"
-      register: route
-
-    - debug: var=route
-
-   
-    when: routing | length > 0
-
-  #
   # Verify network address is ok
   #
   - name: "Validate network address {{ network }} is valid"
@@ -133,6 +101,46 @@
       state: present
     register: net
 
+  #
+  # Routing
+  #
+  - block:
+
+    #
+    # Validate routing content
+    #
+    - name: "Validate routing {{ routing }} is valid"
+      fail: 
+        msg: "The routing {{ routing  }} is not valid"
+      when: not ( routing | regex_search('^[0-9]+.[0-9]+.[0-9]+.[0-9]+\\/[0-9]+ +[0-9]+.[0-9]+.[0-9]+.[0-9]+$') )
+
+    #
+    # Dont allow update default route
+    #
+    - name: "Validate routing {{ routing }} not overwriting default router"
+      fail: 
+        msg: "The routing {{ routing  }} is not valid"
+      when: ( routing | regex_search('^0.0.0.0') )
+
+    #
+    # Extract network and gateway
+    #
+    - name: Define destination network and router
+      set_fact:
+         remote_network: "{{ routing.split(' ')[0] }}"
+         remote_router:  "{{ routing.split(' ')[1] }}"
+         iproutefile: "/etc/sysconfig/network-scripts/route-{{ interface }}"
+
+    #
+    # Update the route-interface file
+    #
+    - name: "Update ip route file {{ iproutefile }}"
+      copy:
+        dest: "{{ iproutefile }}"
+        content: "{{ remote_network }} via {{ remote_router }}"
+      register: route
+
+    when: routing | length > 0
 
   - block:
 
