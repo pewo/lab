@@ -27,7 +27,8 @@
   # End playbook if repo is unchanged
   #
   - block:
-    - debug:
+    - name: Check if repo is updated
+      debug:
         msg: "Repo is unchanged, exiting playbook"
 
     #- meta: end_play
@@ -37,7 +38,8 @@
   #
   # create variable for config location (within repo)
   #
-  - set_fact:
+  - name: Create config variable
+    set_fact:
       config: "{{ git_dest }}/{{ ansible_facts.fqdn }}/config"
       #config: "/tmp/csv"
 
@@ -82,6 +84,34 @@
      msg: "Not allowed to change primary interface {{ ansible_facts.default_ipv4.interface }}"
     when: ansible_facts.default_ipv4.interface == interface
 
+  #
+  # Routing
+  #
+  - block:
+
+    - name: "Validate routing {{ routing }} is valid"
+      fail: 
+        msg: "The routing {{ routing  }} is not valid"
+      when: not ( routing | regex_search('^[0-9]+.[0-9]+.[0-9]+.[0-9]+\\/[0-9]+ +[0-9]+.[0-9]+.[0-9]+.[0-9]+$') )
+
+    - name: "Validate routing {{ routing }} not overwriting default router"
+      fail: 
+        msg: "The routing {{ routing  }} is not valid"
+      when: ( routing | regex_search('^0.0.0.0') )
+
+    - name: Define destination network and router
+      set_fact:
+         remote_network: "{{ routing.split(' ')[0] }}"
+         remote_router:  "{{ routing.split(' ')[1] }}"
+         iproutefile: "/etc/sysconfig/network-scripts/route-{{ interface }}"
+
+    - name: "Update ip route file {{ iproutefile }}"
+      copy:
+        dest: "{{ iproutefile }}"
+        content: "{{ remote_network }} via {{ remote_router }}"
+      register: route
+   
+    when: routing | length > 0
 
   #
   # Verify network address is ok
@@ -91,21 +121,25 @@
       msg: "The ip address {{ network  }} is not valid"
     when: not ( network | regex_search('^[0-9]+.[0-9]+.[0-9]+.[0-9]+\\/[0-9]+$') )
 
-
-
   - name: Configure network interface ip address
     community.general.nmcli:
-      conn_name: ens19
-      ifname: ens19
+      conn_name: "{{ interface }}"
+      ifname: "{{ interface }}"
       type: ethernet
-      ip4: 10.0.0.128/24
-      #gw4: 192.0.2.1
+      ip4: "{{ network }}"
       state: present
     register: net
 
 
   - block:
 
-    - debug: var=net
+    - name: "Bring down the interface {{ interface }}"
+      command: "/usr/sbin/ifdown {{ interface }}"
+      register: down
 
-    when: net.changed is defined and net.changed == true
+    - name: "Bring up the interface {{ interface }}"
+      command: "/usr/sbin/ifup {{ interface }}"
+      register: up
+
+    when: ( net.changed is defined and net.changed == true ) or
+          ( route.changed is defined and route.changed == true )
