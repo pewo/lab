@@ -7,19 +7,31 @@
 
   tasks:
 
+  - set_fact:
+      network: "{{ lookup('csvfile','network file=/tmp/csv delimiter=: col=1') | trim }}"
+      interface: "{{ lookup('csvfile','interface file=/tmp/csv delimiter=: col=1') | trim }}"
+      routing: "{{ lookup('csvfile','routing file=/tmp/csv delimiter=: col=1') | trim }}"
+
+  - debug: var=network,interface,routing
+  - assert:
+      that:
+        - network | length > 0
+        - interface | length > 0
+      quiet: true
+
   #
   # Get some facts
   #
   - setup:
       gather_subset:
-        - min
+        - network
 
-  - set_fact:
-     #ip: "{{ (lookup('file', {{ git_dest }}/{{ ansible_facts.fqdn }}/config) | from_json).get('network') }}"
-     ip: "{{ (lookup('file', '{{ git_dest }}/{{ ansible_facts.fqdn }}/config') | from_json).get('network') }}"
+  - fail:
+     msg: "Not allowed to change primary interface {{ ansible_facts.default_ipv4.interface }}"
+    when: ansible_facts.default_ipv4.interface == interface
 
-  - debug: var=ip
   - meta: end_play
+
   #
   # Update git repo
   #
@@ -28,6 +40,19 @@
       repo: "{{ git_src }}"
       dest: "{{ git_dest }}"
     register: repo
+
+  - set_fact:
+     #ip: "{{ (lookup('file', '{{ git_dest }}/{{ ansible_facts.fqdn }}/ip')) }}"
+     ip: "{{ (lookup('file', '/tmp/ipx')) }}"
+
+  - debug: var=ip
+
+  - fail: 
+      msg: "The ip address {{ ip  }} is not valid"
+    when: not ( ip | regex_search('^[0-9]+.[0-9]+.[0-9]+.[0-9]+\\/[0-9]+$') )
+
+
+  - meta: end_play
 
   #
   # End playbook if repo is unchanged
