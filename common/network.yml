@@ -15,6 +15,7 @@
         - min
 
   - set_fact:
+     #ip: "{{ (lookup('file', {{ git_dest }}/{{ ansible_facts.fqdn }}/config) | from_json).get('network') }}"
      ip: "{{ (lookup('file', '{{ git_dest }}/{{ ansible_facts.fqdn }}/config') | from_json).get('network') }}"
 
   - debug: var=ip
