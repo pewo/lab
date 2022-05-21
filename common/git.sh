@@ -25,3 +25,6 @@ git add .
 echo git commit -m "Autogit: `date`"
 git commit -m "Autogit: `date`"
 
+echo "git push"
+git push
+
