@@ -14,6 +14,11 @@
       gather_subset:
         - min
 
+  - set_fact:
+     ip: "{{ (lookup('file', '{{ git_dest }}/{{ ansible_facts.fqdn }}/config') | from_json).get('network') }}"
+
+  - debug: var=ip
+  - meta: end_play
   #
   # Update git repo
   #
