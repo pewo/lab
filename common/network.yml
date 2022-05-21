@@ -14,61 +14,14 @@
       gather_subset:
         - network
 
-  - set_fact:
-      config: "{{ git_dest }}/{{ ansible_facts.fqdn }}/config"
-      #config: "/tmp/csv"
-
-  - name: "Check config file {{ config }}"
-    stat:
-      path: "{{ config }}"
-    register: st
-
-  - debug: var=st
-
-  - fail:
-     msg: "Something wrong or missing configuration file {{ config }}"
-    when: st.stat.exists is defined and ( st.stat.exists == false or st.stat.isreg == false )
-
-  - set_fact:
-      network: "{{ lookup('csvfile','network file={{ config }} delimiter=: col=1') | trim }}"
-      interface: "{{ lookup('csvfile','interface file={{ config }} delimiter=: col=1') | trim }}"
-      routing: "{{ lookup('csvfile','routing file={{ config }} delimiter=: col=1') | trim }}"
-
-  - assert:
-      that:
-        - network | length > 0
-        - interface | length > 0
-      quiet: true
-
-
-  - fail:
-     msg: "Not allowed to change primary interface {{ ansible_facts.default_ipv4.interface }}"
-    when: ansible_facts.default_ipv4.interface == interface
-
-
-  - meta: end_play
-
   #
-  # Update git repo
+  # Update local git repo
   #
   - name: get config from git
     git:
       repo: "{{ git_src }}"
       dest: "{{ git_dest }}"
     register: repo
-
-  - set_fact:
-     #ip: "{{ (lookup('file', '{{ git_dest }}/{{ ansible_facts.fqdn }}/ip')) }}"
-     ip: "{{ (lookup('file', '/tmp/ipx')) }}"
-
-  - debug: var=ip
-
-  - fail: 
-      msg: "The ip address {{ ip  }} is not valid"
-    when: not ( ip | regex_search('^[0-9]+.[0-9]+.[0-9]+.[0-9]+\\/[0-9]+$') )
-
-
-  - meta: end_play
 
   #
   # End playbook if repo is unchanged
@@ -80,13 +33,67 @@
     #- meta: end_play
 
     when: repo.changed is defined and repo.changed == false
-    
+
+  #
+  # create variable for config location (within repo)
+  #
+  - set_fact:
+      config: "{{ git_dest }}/{{ ansible_facts.fqdn }}/config"
+      #config: "/tmp/csv"
+
+  #
+  # Check if config exists
+  #
+  - name: "Check config file {{ config }}"
+    stat:
+      path: "{{ config }}"
+    register: st
+
+  # 
+  # Exit if we are missing configuration file
+  #
+  - name: Check if {{ config }} exist
+    fail:
+     msg: "Something wrong or missing configuration file {{ config }}"
+    when: st.stat.exists is defined and ( st.stat.exists == false or st.stat.isreg == false )
+
+  #
+  # Extract network information from config file
+  #
+  - set_fact:
+      network: "{{ lookup('csvfile','network file={{ config }} delimiter=: col=1') | trim }}"
+      interface: "{{ lookup('csvfile','interface file={{ config }} delimiter=: col=1') | trim }}"
+      routing: "{{ lookup('csvfile','routing file={{ config }} delimiter=: col=1') | trim }}"
+
+  #
+  # Verify that the required fields are present "network and intetface"
+  #
+  - assert:
+      that:
+        - network | length > 0
+        - interface | length > 0
+      quiet: true
+
+  #
+  # We do not update the primary interface
+  #
+  - name: "Check if we are trying to update primary interface {{ ansible_facts.default_ipv4.interface }}"
+    fail:
+     msg: "Not allowed to change primary interface {{ ansible_facts.default_ipv4.interface }}"
+    when: ansible_facts.default_ipv4.interface == interface
 
 
-    #ansible_facts.fqdn
-#  - debug: var=ansible_facts.fqdn
+  #
+  # Verify network address is ok
+  #
+  - name: "Validate network address {{ network }} is valid"
+    fail: 
+      msg: "The ip address {{ network  }} is not valid"
+    when: not ( network | regex_search('^[0-9]+.[0-9]+.[0-9]+.[0-9]+\\/[0-9]+$') )
 
-  - name: Optionally, at the same time specify IPv6 addresses for the device
+
+
+  - name: Configure network interface ip address
     community.general.nmcli:
       conn_name: ens19
       ifname: ens19
