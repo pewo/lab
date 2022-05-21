@@ -84,6 +84,20 @@
      msg: "Not allowed to change primary interface {{ ansible_facts.default_ipv4.interface }}"
     when: ansible_facts.default_ipv4.interface == interface
 
+  - name: Update firewalld zone block to block
+    ansible.posix.firewalld:
+      zone: drop
+      target: DROP
+      state: enabled
+      permanent: true
+
+  - name: "Add interface {{ interface }} to zone block"
+    ansible.posix.firewalld:
+      zone: drop
+      state: enabled
+      permanent: yes
+      immediate: true
+      interface: "{{ interface }}"
   #
   # Verify network address is ok
   #
