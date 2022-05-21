@@ -13,6 +13,15 @@
       dest: /etc/lab
     register: repo
 
+  - block:
+    - debug:
+        msg: "Repo is unchanged, exiting playbook"
+
+    - meta: end_play
+
+    when: repo.changed is defined and repo.changed == false
+    
+
   - debug: var=repo
 
   - meta: end_play
