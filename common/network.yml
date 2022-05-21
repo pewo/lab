@@ -110,6 +110,9 @@
         dest: "{{ iproutefile }}"
         content: "{{ remote_network }} via {{ remote_router }}"
       register: route
+
+    - debug: var=route
+
    
     when: routing | length > 0
 
