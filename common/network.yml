@@ -88,17 +88,24 @@
     when: ansible_facts.default_ipv4.interface == interface
 
   - debug: var=ansible_facts.{{ interface }}.device
+  - set_fact:
+      bepa: ansible_facts.{{ interface }}.device
+
+  - debug: var=bepa
 
   - name: "Check network interface {{ interface }}"
     set_fact:
-       is_interface: "{{ ansible_facts.interface.device | default(omit) }}"
+            #is_interface: "{{ hostvars[inventory_hostname][item].device }}"
+      is_interface: "{{ hostvars[inventory_hostname]['ens19'] }}"
 
   - debug: var=is_interface
+  - meta: end_play
 
   - name: "Check if {{ interface }}  is a network interface"
     fail: 
       msg: "{{ interface }} is not an network interface"
-    when: is_interface is not defined
+    when: "ansible_facts.{{ interface }}.device"
+    #is_interface is not defined
 
   - meta: end_play
 
