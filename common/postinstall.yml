@@ -1,0 +1,17 @@
+- hosts: localhost
+  gather_facts: true
+
+  vars:
+    git_dest: /etc/lab
+    git_src: git@github.com:pewo/lab.git
+
+  tasks:
+
+  - name: install required packages
+    package:
+      name:
+        - epel-release
+        - ansible-collection-community-general
+        - ansible-collection-ansible-posix.noarch
+        - git
+      state: present
