@@ -113,41 +113,68 @@
         - /usr/bin/firewall-cmd
         - --list-interfaces
         - --zone=drop
-    register: inzone
+    register: indropzone
+    changed_when: false
 
-  - debug: var=inzone
-  - meta: end_play
+  - block:
+
+    #
+    # Move lab interface to drop zone
+    #
+    - name: "Move interface {{ interface }} to drop zone"
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/firewall-cmd
+          - "--change-interface={{ interface }}"
+          - --permanent
+          - --zone=drop
+            
+    #
+    # Reload firewalld
+    #
+    - name: Reload firewalld
+      ansible.builtin.command: 
+        argv:
+          - /usr/bin/firewall-cmd
+          - --reload
+    when: not ( indropzone.stdout | regex_search(interface) )
+
+
   #
-  # Move lab interface to drop zone
+  # Check if primary interface is in dmz zone
   #
-  - name: "Move interface {{ interface }} to drop zone"
+  - name: "Check if interface {{ ansible_facts.default_ipv4.interface }} is in dmz zone"
     ansible.builtin.command:
       argv:
         - /usr/bin/firewall-cmd
-        - "--change-interface={{ interface }}"
-        - --permanent
-        - --zone=drop
-  - meta: end_play
-
-  #
-  # Move primary interface to dmz zone
-  #
-  - name: "Move interface {{ ansible_facts.default_ipv4.interface }} to drop zone"
-    ansible.builtin.command:
-      argv:
-        - /usr/bin/firewall-cmd
-        - "--change-interface={{ ansible_facts.default_ipv4.interface }}"
-        - --permanent
+        - --list-interfaces
         - --zone=dmz
+    register: indmzzone
+    changed_when: false
+    
+  - block:
 
-  #
-  # Reload firewalld
-  #
-  - name: Reload firewalld
-    ansible.builtin.command: 
-      argv:
-        - /usr/bin/firewall-cmd
-        - --reload
+    #
+    # Move primary interface to dmz zone
+    #
+    - name: "Move interface {{ ansible_facts.default_ipv4.interface }} to drop zone"
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/firewall-cmd
+          - "--change-interface={{ ansible_facts.default_ipv4.interface }}"
+          - --permanent
+          - --zone=dmz
+  
+    #
+    # Reload firewalld
+    #
+    - name: Reload firewalld
+      ansible.builtin.command: 
+        argv:
+          - /usr/bin/firewall-cmd
+          - --reload
+
+    when: not ( indmzzone.stdout | regex_search(ansible_facts.default_ipv4.interface) )
 
   #
   # Verify network address is ok
@@ -196,14 +223,6 @@
          remote_router:  "{{ routing.split(' ')[1] }}"
          iproutefile: "/etc/sysconfig/network-scripts/route-{{ interface }}"
 
-    - stat:
-        path: "{{ iproutefile }}"
-      register: st
-
-    - debug: var=st
-
-    - meta: end_play
-
     #
     # Create the iproute file
     #
@@ -216,22 +235,17 @@
     #
     # Update the route-interface file
     #
-    #- name: "Update ip route file {{ iproutefile }}"
-    #  ansible.builtin.template:
-    #    src: /root/iproute-template.j2
-    #    dest: "{{ iproutefile }}"
-    #  register: route
-    
     - name: "Update ip route file {{ iproutefile }}"
-      ansible.builtin.lineinfile:
-        path: "{{ iproutefile }}"
-        line: "{{ remote_network }} via {{ remote_router }}"
-      check_mode: true
+      ansible.builtin.template:
+        src: /root/iproute-template.j2
+        dest: "{{ iproutefile }}"
       register: route
-
-    - debug: var=route
-
-    - meta: end_play
+    
+      #- name: "Update ip route file {{ iproutefile }}"
+      #ansible.builtin.lineinfile:
+      #  path: "{{ iproutefile }}"
+      #  line: "{{ remote_network }} via {{ remote_router }}"
+      #register: route
 
     when: routing | length > 0
 
