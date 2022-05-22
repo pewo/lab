@@ -89,7 +89,7 @@
 
   - debug: var=ansible_facts.{{ interface }}.device
   - set_fact:
-      bepa: ansible_facts.{{ interface }}.device
+      bepa: "{{ ansible_facts[interface]['active'] }}"
 
   - debug: var=bepa
 
