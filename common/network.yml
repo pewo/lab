@@ -105,6 +105,19 @@
     when: network_type is not defined
 
   #
+  # Check if interface is in drop zone
+  #
+  - name: "Check if interface {{ interface }} is in drop zone"
+    ansible.builtin.command:
+      argv:
+        - /usr/bin/firewall-cmd
+        - --list-interfaces
+        - --zone=drop
+    register: inzone
+
+  - debug: var=inzone
+  - meta: end_play
+  #
   # Move lab interface to drop zone
   #
   - name: "Move interface {{ interface }} to drop zone"
@@ -114,6 +127,7 @@
         - "--change-interface={{ interface }}"
         - --permanent
         - --zone=drop
+  - meta: end_play
 
   #
   # Move primary interface to dmz zone
@@ -182,14 +196,42 @@
          remote_router:  "{{ routing.split(' ')[1] }}"
          iproutefile: "/etc/sysconfig/network-scripts/route-{{ interface }}"
 
+    - stat:
+        path: "{{ iproutefile }}"
+      register: st
+
+    - debug: var=st
+
+    - meta: end_play
+
+    #
+    # Create the iproute file
+    #
+    - name: Create empty iproute file ( if non existing )
+      copy:
+        content: "{{ remote_network }} via {{ remote_router }}"
+        dest: "{{ iproutefile }}"
+        force: no
+
     #
     # Update the route-interface file
     #
+    #- name: "Update ip route file {{ iproutefile }}"
+    #  ansible.builtin.template:
+    #    src: /root/iproute-template.j2
+    #    dest: "{{ iproutefile }}"
+    #  register: route
+    
     - name: "Update ip route file {{ iproutefile }}"
-      copy:
-        dest: "{{ iproutefile }}"
-        content: "{{ remote_network }} via {{ remote_router }}"
+      ansible.builtin.lineinfile:
+        path: "{{ iproutefile }}"
+        line: "{{ remote_network }} via {{ remote_router }}"
+      check_mode: true
       register: route
+
+    - debug: var=route
+
+    - meta: end_play
 
     when: routing | length > 0
 
