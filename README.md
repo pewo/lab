@@ -2,14 +2,16 @@
 
 This playbook uses a git repositry to manage local network configuration
 
-Layout:
-
+# Layout
+```
 repo/<fqdn>/config
-------------------
-
+```
+# Example config
+```
 interface: ens19
-network: 10.0.0.129/24
-routing: 192.168.100.0/24 10.0.0.129
+network: 10.0.0.128/24
+routing: 10.1.0.0/24 10.0.0.1
+```
 
 # interrface
 This is the name of the interface
