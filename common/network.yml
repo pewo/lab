@@ -14,9 +14,6 @@
       gather_subset:
         - network
 
-          #- debug: var=ansible_facts
-          #- meta: end_play
-
   #
   # Update local git repo
   #
@@ -79,6 +76,9 @@
         - interface | length > 0
       quiet: true
 
+      #- set_fact:
+      #interface: ens666
+
   #
   # We do not update the primary interface
   #
@@ -87,39 +87,36 @@
      msg: "Not allowed to change primary interface {{ ansible_facts.default_ipv4.interface }}"
     when: ansible_facts.default_ipv4.interface == interface
 
-  - debug: var=ansible_facts.{{ interface }}.device
-  - set_fact:
-      bepa: "{{ ansible_facts[interface]['active'] }}"
+    #- debug: var=ansible_facts.{{ interface }}
 
-  - debug: var=bepa
-
-  - name: "Check network interface {{ interface }}"
+  #
+  # Check if type is defined in facts, i.e. the interface exists
+  #
+  - name: "Get network type for interface {{ interface }}"
     set_fact:
-            #is_interface: "{{ hostvars[inventory_hostname][item].device }}"
-      is_interface: "{{ hostvars[inventory_hostname]['ens19'] }}"
+      network_type: "{{ ansible_facts[interface]['type'] | default(omit) }}"
 
-  - debug: var=is_interface
-  - meta: end_play
+  #
+  # Check if network_type is defined
+  #
+  - name: "Check if {{ interface }} is a network interface"
+    fail:
+     msg: "{{ interface }} is not a valid network interface"
+    when: network_type is not defined
 
-  - name: "Check if {{ interface }}  is a network interface"
-    fail: 
-      msg: "{{ interface }} is not an network interface"
-    when: "ansible_facts.{{ interface }}.device"
-    #is_interface is not defined
-
-  - meta: end_play
-
-    #       "ens18": {
-    #"active": true,
-    #"device": "ens18",
-
+  # 
+  # Update zone block to do block
+  #
   - name: Update firewalld zone block to block
     ansible.posix.firewalld:
       zone: drop
       target: DROP
       state: enabled
       permanent: true
-
+      
+  #
+  # Move interface to block zone
+  #
   - name: "Add interface {{ interface }} to zone block"
     ansible.posix.firewalld:
       zone: drop
