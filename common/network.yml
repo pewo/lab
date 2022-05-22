@@ -104,26 +104,37 @@
      msg: "{{ interface }} is not a valid network interface"
     when: network_type is not defined
 
-  # 
-  # Update zone block to do block
   #
-  - name: Update firewalld zone block to block
-    ansible.posix.firewalld:
-      zone: drop
-      target: DROP
-      state: enabled
-      permanent: true
-      
+  # Move lab interface to drop zone
   #
-  # Move interface to block zone
+  - name: "Move interface {{ interface }} to drop zone"
+    ansible.builtin.command:
+      argv:
+        - /usr/bin/firewall-cmd
+        - "--change-interface={{ interface }}"
+        - --permanent
+        - --zone=drop
+
   #
-  - name: "Add interface {{ interface }} to zone block"
-    ansible.posix.firewalld:
-      zone: drop
-      state: enabled
-      permanent: yes
-      immediate: true
-      interface: "{{ interface }}"
+  # Move primary interface to dmz zone
+  #
+  - name: "Move interface {{ ansible_facts.default_ipv4.interface }} to drop zone"
+    ansible.builtin.command:
+      argv:
+        - /usr/bin/firewall-cmd
+        - "--change-interface={{ ansible_facts.default_ipv4.interface }}"
+        - --permanent
+        - --zone=dmz
+
+  #
+  # Reload firewalld
+  #
+  - name: Reload firewalld
+    ansible.builtin.command: 
+      argv:
+        - /usr/bin/firewall-cmd
+        - --reload
+
   #
   # Verify network address is ok
   #
