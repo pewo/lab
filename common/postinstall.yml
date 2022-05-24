@@ -1,3 +1,5 @@
+---
+
 - hosts: all
   gather_facts: true
 
@@ -7,38 +9,40 @@
 
   tasks:
 
-  - name: install epel-release 
-    package:
-      name:
-        - epel-release
-      state: present
+    - name: install epel-release
+      package:
+        name:
+          - epel-release
+        state: present
 
-  - name: install required packages
-    package:
-      name:
-        - epel-release
-        - ansible-collection-community-general
-        - ansible-collection-ansible-posix.noarch
-        - git
-        - vim
-      state: present
+    - name: install required packages
+      package:
+        name:
+          - epel-release
+          - ansible-collection-community-general
+          - ansible-collection-ansible-posix.noarch
+          - git
+          - vim
+        state: present
 
-  - name: install network playbook
-    copy: 
-      src: /local/ansible/lab/lab/common/network.yml
-      dest: /root/network.yml
+    - name: install network playbook
+      copy:
+        src: /local/ansible/lab/lab/common/network.yml
+        dest: /root/network.yml
 
-  - name: install iproute template
-    copy: 
-      src: /local/ansible/lab/lab/common/iproute-template.j2
-      dest: /root/iproute-template.j2
-    
-  - name: Create random number
-    set_fact:
-       min: "{{ 59 |random(seed=inventory_hostname) }}"
+    - name: install iproute template
+      copy:
+        src: /local/ansible/lab/lab/common/iproute-template.j2
+        dest: /root/iproute-template.j2
 
-  - name: Create cronjob
-    ansible.builtin.cron:
-      name: "network_update"
-      minute: "{{ min }}"
-      job: "/usr/bin/ansible-playbook /root/network.yml > /root/network.cronlog 2>&1"
+    - name: Create random number
+      set_fact:
+        min: "{{ 59 |random(seed=inventory_hostname) }}"
+
+    - name: Create cronjob
+      ansible.builtin.cron:
+        name: "network_update"
+        minute: "{{ min }}"
+        job: >
+          "/usr/bin/ansible-playbook /root/network.yml
+          > /root/network.cronlog 2>&1"
