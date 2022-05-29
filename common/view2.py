@@ -2,20 +2,33 @@
 import os
 import socket
 import json
+import time
+import subprocess
 from flask import Flask, Response, request
 
 APP = Flask(__name__)
 
 ROOT = "/var/tmp/labconf"
 
+START = int(time.time())
+refresh_conf = 0
+
+print("Starting:", START)
+
 
 def resolve_ip(ip_address):
     # type: (str) -> str
     """Resolve a hostname to its IP if possible"""
-    interfaces = socket.gethostbyaddr(ip_address)
-    if len(interfaces) == 0:
+    try:
+        interfaces = socket.gethostbyaddr(ip_address)
+    except Exception as e:
+        print("Error getting hostname using ip address", ip_address, " error: ", e)
         return ip_address
-    addr = interfaces[0]
+    else:
+        if len(interfaces) == 0:
+            return ip_address
+        addr = interfaces[0]
+
     return addr
 
 def labconf(ip_address):
@@ -35,22 +48,25 @@ def labconf(ip_address):
 
     try:
         f = open(conf, "r")
-    except:
+    except Exception as e:
+        print("Error reading file", conf, " error: ", e)
         return myjson
     else:
+        line_no = 0
         for line in f:
-            print("line:", line)
-            #y = line.strip()
-            #print("y:", y)
+            line_no += 1
+            #print("line(", line_no, "): ", line.strip())
             key, value = line.strip().split(":", 2)
             if key:
                 key = key.rstrip().lstrip()
             else:
+                print("Bad key on line", lineno)
                 continue
 
             if value:
                 value = value.rstrip().lstrip()
             else:
+                print("Bad value on line", line_no)
                 continue
             myjson[key] = value
         f.close()
@@ -59,10 +75,28 @@ def labconf(ip_address):
 
 
 
-@APP.route('/test')
-def test():
+@APP.route('/')
+def home():
     """Function to get labconf"""
     res = ""
+    global refresh_conf
+
+    refresh_age = int(time.time()) - refresh_conf
+
+    print("refresh_age:", refresh_age)
+    print("refresh_conf:", refresh_conf)
+
+    if refresh_conf < 1 or refresh_age > 20: 
+        refresh_conf = int(time.time())
+        print("Refreshing labconf")
+        try:
+            subprocess.call(["/usr/bin/git", "-C", ROOT, "pull"])
+            subprocess.call(["/usr/bin/ls", "-la"])
+        except Exception as e:
+            print("Error updating labconf, error:", e)
+        else:
+            print("Updating labconf ok")
+
     #for k, v in os.environ.items():
     #   str += k + "=" + v + "<BR>"
     #str += pprint.pformat(request.environ, depth=5) + '<BR><BR>'
