@@ -27,7 +27,8 @@ def labconf(ip_address):
     conf = ROOT + "/" + addr + "/config"
     try:
         st_file = os.stat(conf)
-    except:
+    except Exception as e:
+        print("Error checking file", conf, " error: ", e)
         return myjson
     else:
         myjson["mtime"] = int(st_file.st_mtime)
