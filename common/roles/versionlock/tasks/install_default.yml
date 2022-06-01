@@ -1,0 +1,6 @@
+---
+
+- debug: 
+    msg: "No install task for {{ osrel }}"
+
+- meta: end_host

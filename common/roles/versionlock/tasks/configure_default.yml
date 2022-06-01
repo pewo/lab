@@ -1,0 +1,6 @@
+---
+
+- debug: 
+    msg: "No configure task for {{ osrel }}"
+
+- meta: end_host

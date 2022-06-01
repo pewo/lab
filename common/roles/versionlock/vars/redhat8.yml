@@ -1,0 +1,6 @@
+---
+
+versionlock_packages:
+  - python3-dnf-plugin-versionlock
+
+versionlock_list: /etc/dnf/plugins/versionlock.list
