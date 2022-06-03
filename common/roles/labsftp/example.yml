@@ -1,0 +1,17 @@
+---
+- hosts: all
+  gather_facts: true
+  pre_tasks:
+
+  - name: Defined sftp_readonly based on name
+    set_fact: 
+      sftp_readonly_var: true
+    when: inventory_hostname | regex_search('intake')
+
+  - debug: var=sftp_readonly_var
+
+  roles:
+  - role: labsftp
+    tags: labsftp
+    vars:
+      sftp_readonly: "{{ sftp_readonly_var | default(false) }}"

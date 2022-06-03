@@ -1,0 +1,7 @@
+---
+
+sshd_sh_dst: /root/sshd.sh
+sshd_config: /etc/ssh/sshd_config
+sshd: /usr/sbin/sshd
+sshd_service: sshd
+sftp_readonly_argument:

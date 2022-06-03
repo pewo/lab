@@ -1,0 +1,37 @@
+---
+
+- name: register OS and major version
+  set_fact: 
+     osrel: "{{ ansible_os_family | lower }}{{ ansible_distribution_major_version }}"
+
+- name: Include variables for specific OS
+  include_vars: "{{ item }}"
+  with_first_found:
+    - "{{ osrel }}.yml"
+    - default.yml
+
+- block:
+  - name: "Check if we have loaded vars"
+    debug:
+      msg: "Ending host because of missing variables"
+
+  - meta: end_host
+
+  when: sshd_sh_src is not defined  or sshd_sh_dst is not defined
+
+- name: Copy file with owner and permissions
+  copy:
+    src: "{{ sshd_sh_src }}"
+    dest: "{{ sshd_sh_dst }}"
+    owner: root
+    mode: '0700'
+
+- name: sftp configuration only on in/out servers
+  set_fact:
+     labinout: true
+  when: inventory_hostname | regex_search('intake|outtake')
+
+
+- name: include sftp tasks for in/out servers
+  include_tasks: sftp.yml
+  when: labinout is defined and labinout == true

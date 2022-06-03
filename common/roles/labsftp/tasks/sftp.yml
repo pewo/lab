@@ -1,0 +1,28 @@
+---
+- name: Enumerate sftp_readonly to correct sftp argument
+  set_fact: 
+    sftp_readonly_argument: -R
+  when: sftp_readonly is defined and sftp_readonly == true
+
+- name: Insert/Update "Match User" configuration block in "{{ sshd_config }}"
+  blockinfile:
+    path: /etc/ssh/sshd_config
+    marker: "# -- {mark} ANSIBLE MANAGED BLOCK --"
+    block: |
+      Match user root
+          PermitRootLogin prohibit-password
+          PasswordAuthentication no
+          ChrootDirectory /
+          ForceCommand "{{ sshd_sh_dst }}"
+      Match user *
+          PermitRootLogin no
+          PasswordAuthentication yes
+          ForceCommand internal-sftp {{ sftp_readonly_argument }}
+    validate: "{{ sshd }} -T -f %s"
+  register: sshd_change
+
+- name: restart sshd
+  service:
+    name: "{{ sshd_service }}"
+    state: restarted
+  when: sshd_change.changed
