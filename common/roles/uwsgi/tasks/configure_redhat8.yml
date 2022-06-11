@@ -1,0 +1,12 @@
+---
+
+- name: Configure versionlocks
+  lineinfile:
+    path: "{{ versionlock_list }}"
+    regexp: "^{{ vl.regex }}"
+    line: "{{ vl.package }}"
+  loop: "{{ versionlocks }}"
+  loop_control:
+     loop_var: vl
+     label: "{{ vl.package }}"
+  when: versionlock_list is defined and versionlocks is defined

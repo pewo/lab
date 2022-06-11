@@ -1,0 +1,8 @@
+---
+
+uwsgi_packages:
+        - uwsgi
+        - uwsgi-plugin-python3
+        - python3-flask
+
+uwsgi_app_dir: /local/uwsgi

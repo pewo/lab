@@ -1,0 +1,7 @@
+---
+
+- name: install versionlock packages
+  yum:
+    name: "{{ versionlock_packages }}" 
+  register: packages
+  when: versionlock_packages is defined

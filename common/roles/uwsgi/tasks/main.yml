@@ -1,0 +1,51 @@
+---
+
+- name: register OS and major version
+  set_fact: 
+     osrel: "{{ ansible_os_family | lower }}{{ ansible_distribution_major_version }}"
+
+- name: Include variables for specific OS
+  include_vars: "{{ item }}"
+  with_first_found:
+    - "{{ osrel }}.yml"
+    - default.yml
+
+
+- block:
+  - name: "Check if we have loaded vars"
+    debug:
+      msg: "Ending host because of missing vars file {{ osrel }}.yml"
+
+  - meta: end_host
+
+  when: uwsgi_packages is not defined or uwsgi_app_dir is not defined 
+
+- name: "Check if {{ uwsgi_app_dir }} is present"
+  stat:
+    path: "{{ uwsgi_app_dir: }}"
+  register: st
+
+- debug: var=st
+
+- meta: end_play
+
+- block:
+
+  - name: Include installation tasks
+    include_tasks: "{{ item }}"
+    with_first_found:
+      - "install_{{ osrel }}.yml"
+      - install_default.yml
+
+  when: st.stat.exists is defined and st.stat.exists == false
+
+
+- block:
+
+  - name: Include configuration tasks
+    include_tasks: "{{ item }}"
+    with_first_found:
+      - "configure_{{ osrel }}.yml"
+      - configure_default.yml
+
+  when: versionlocks is defined
