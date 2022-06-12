@@ -4,326 +4,279 @@
   gather_facts: false
 
   vars:
-    #git_dest: /etc/lab
-    #git_src: git@github.com:pewo/lab.git
     localchange: /root/labconf.latest
 
   tasks:
 
-  #
-  # Get config from web server
-  #
-  - name: Get labconf data
-    uri:
-      url: http://uwsgi:5000/
-      return_content: yes
-      body_format: json
-    register: this
-    #failed_when: false
-    #ignore_errors: true
-
-  #- debug: var=this
-    
-  #
-  # End playbook if we can't get config updates
-  #
-  - assert:
-      that:
-        - this.content  | length > 0
-      quiet: true
-
-  - block:
-    - name: Check if config src is available
-      debug:
-        msg: "No config source, exiting playbook"
-
-    - meta: end_play
-
-    when: ( this.json.mtime is not defined )
-  
-  #
-  # Check if localchange exists
-  #
-  - name: "Check localchange file {{ localchange }}"
-    stat:
-      path: "{{ localchange }}"
-    register: st
-
-  #
-  # End playbook if repo is unchanged
-  #
-  - block:
-    - name: Check if config is updated
-      debug:
-        msg: "No config update, exiting playbook"
-
-    - meta: end_play
-
-    when: ( st.stat.mtime is defined ) and ( this.json.mtime|int < st.stat.mtime|int )
-
-  - name: Update localchange if new config
-    copy:
-      content: "{{ this.json }}"
-      dest: "{{ localchange }}"
-    register: update
-    when: ( st.stat.mtime is not defined ) or ( this.json.mtime|int > st.stat.mtime|int )
-
-
-  #
-  # Get some facts
-  #
-  - setup:
-      gather_subset:
-        - network
-
-  #
-  # Update local git repo
-  #
-  #- name: get config from git
-  #  git:
-  #    repo: "{{ git_src }}"
-  #    dest: "{{ git_dest }}"
-  #  register: repo
-  #
-  #
-  # End playbook if repo is unchanged
-  #
-  #- block:
-  #  - name: Check if repo is updated
-  #    debug:
-  #      msg: "Repo is unchanged, exiting playbook"
-  #
-  #  #- meta: end_play
-  #
-  #  when: repo.changed is defined and repo.changed == false
-
-  #
-  # create variable for config location (within repo)
-  #
-  #- name: Create config variable
-  #  set_fact:
-  #    config: "{{ git_dest }}/{{ ansible_facts.fqdn }}/config"
-  #    #config: "/tmp/csv"
-  #
-  #
-  # Check if config exists
-  #
-  #- name: "Check config file {{ config }}"
-  #  stat:
-  #    path: "{{ config }}"
-  #  register: st
-  #
-  # 
-  # Exit if we are missing configuration file
-  #
-  #- name: Check if {{ config }} exist
-  #  fail:
-  #   msg: "Something wrong or missing configuration file {{ config }}"
-  #  when: st.stat.exists is defined and ( st.stat.exists == false or st.stat.isreg == false )
-  #
-  #
-  # Extract network information from config file
-  #
-  #- set_fact:
-  #    network: "{{ lookup('csvfile','network file={{ config }} delimiter=: col=1') | trim }}"
-  #    interface: "{{ lookup('csvfile','interface file={{ config }} delimiter=: col=1') | trim }}"
-  #    routing: "{{ lookup('csvfile','routing file={{ config }} delimiter=: col=1') | trim }}"
-  - set_fact:
-      network: "{{ this.json.network }}"
-      interface: "{{ this.json.interface }}"
-      routing: "{{ this.json.routing }}"
-
-  #
-  # Verify that the required fields are present "network and intetface"
-  #
-  - assert:
-      that:
-        - network | length > 0
-        - interface | length > 0
-      quiet: true
-
-      #- set_fact:
-      #interface: ens666
-
-  #
-  # We do not update the primary interface
-  #
-  - name: "Check if we are trying to update primary interface {{ ansible_facts.default_ipv4.interface }}"
-    fail:
-     msg: "Not allowed to change primary interface {{ ansible_facts.default_ipv4.interface }}"
-    when: ansible_facts.default_ipv4.interface == interface
-
-    #- debug: var=ansible_facts.{{ interface }}
-
-  #
-  # Check if type is defined in facts, i.e. the interface exists
-  #
-  - name: "Get network type for interface {{ interface }}"
-    set_fact:
-      network_type: "{{ ansible_facts[interface]['type'] | default(omit) }}"
-
-  #
-  # Check if network_type is defined
-  #
-  - name: "Check if {{ interface }} is a network interface"
-    fail:
-     msg: "{{ interface }} is not a valid network interface"
-    when: network_type is not defined
-
-  #
-  # Check if interface is in drop zone
-  #
-  - name: "Check if interface {{ interface }} is in drop zone"
-    ansible.builtin.command:
-      argv:
-        - /usr/bin/firewall-cmd
-        - --list-interfaces
-        - --zone=drop
-    register: indropzone
-    changed_when: false
-
-  - block:
+    #
+    # Get config from web server
+    #
+    - name: Get labconf data
+      uri:
+        url: http://uwsgi:5000/
+        return_content: true
+        body_format: json
+      register: this
 
     #
-    # Move lab interface to drop zone
+    # End playbook if we can't get config updates
     #
-    - name: "Move interface {{ interface }} to drop zone"
-      ansible.builtin.command:
-        argv:
-          - /usr/bin/firewall-cmd
-          - "--change-interface={{ interface }}"
-          - --permanent
-          - --zone=drop
-            
-    #
-    # Reload firewalld
-    #
-    - name: Reload firewalld
-      ansible.builtin.command: 
-        argv:
-          - /usr/bin/firewall-cmd
-          - --reload
-    when: not ( indropzone.stdout | regex_search(interface) )
+    - name: Check if we got any config
+      assert:
+        that:
+          - this.content  | length > 0
+        quiet: true
 
+    - block:
+        - name: Check if config src is available
+          debug:
+            msg: "No config source, exiting playbook"
 
-  #
-  # Check if primary interface is in dmz zone
-  #
-  - name: "Check if interface {{ ansible_facts.default_ipv4.interface }} is in dmz zone"
-    ansible.builtin.command:
-      argv:
-        - /usr/bin/firewall-cmd
-        - --list-interfaces
-        - --zone=dmz
-    register: indmzzone
-    changed_when: false
-    
-  - block:
+        - meta: end_play
+
+      when: ( this.json.mtime is not defined )
 
     #
-    # Move primary interface to dmz zone
+    # Check if localchange exists
     #
-    - name: "Move interface {{ ansible_facts.default_ipv4.interface }} to drop zone"
-      ansible.builtin.command:
-        argv:
-          - /usr/bin/firewall-cmd
-          - "--change-interface={{ ansible_facts.default_ipv4.interface }}"
-          - --permanent
-          - --zone=dmz
-  
-    #
-    # Reload firewalld
-    #
-    - name: Reload firewalld
-      ansible.builtin.command: 
-        argv:
-          - /usr/bin/firewall-cmd
-          - --reload
-
-    when: not ( indmzzone.stdout | regex_search(ansible_facts.default_ipv4.interface) )
-
-  #
-  # Verify network address is ok
-  #
-  - name: "Validate network address {{ network }} is valid"
-    fail: 
-      msg: "The ip address {{ network  }} is not valid"
-    when: not ( network | regex_search('^[0-9]+.[0-9]+.[0-9]+.[0-9]+\\/[0-9]+$') )
-
-  - name: Configure network interface ip address
-    community.general.nmcli:
-      conn_name: "{{ interface }}"
-      ifname: "{{ interface }}"
-      type: ethernet
-      ip4: "{{ network }}"
-      state: present
-    register: net
-
-  #
-  # Routing
-  #
-  - block:
+    - name: "Check localchange file {{ localchange }}"
+      stat:
+        path: "{{ localchange }}"
+      register: st
 
     #
-    # Validate routing content
+    # End playbook if repo is unchanged
     #
-    - name: "Validate routing {{ routing }} is valid"
-      fail: 
-        msg: "The routing {{ routing  }} is not valid"
-      when: not ( routing | regex_search('^[0-9]+.[0-9]+.[0-9]+.[0-9]+\\/[0-9]+ +[0-9]+.[0-9]+.[0-9]+.[0-9]+$') )
+    - block:
+        - name: Check if config is updated
+          debug:
+            msg: "No config update, exiting playbook"
+
+        - meta: end_play
+
+      when: ( st.stat.mtime is defined ) and
+            ( this.json.mtime|int < st.stat.mtime|int )
 
     #
-    # Dont allow update default route
+    # Get some facts
     #
-    - name: "Validate routing {{ routing }} not overwriting default router"
-      fail: 
-        msg: "The routing {{ routing  }} is not valid"
-      when: ( routing | regex_search('^0.0.0.0') )
+    - name: Collect network facts
+      setup:
+        gather_subset:
+          - network
 
-    #
-    # Extract network and gateway
-    #
-    - name: Define destination network and router
+    - name: Save facts in local variables
       set_fact:
-         remote_network: "{{ routing.split(' ')[0] }}"
-         remote_router:  "{{ routing.split(' ')[1] }}"
-         iproutefile: "/etc/sysconfig/network-scripts/route-{{ interface }}"
+        network: "{{ this.json.network }}"
+        interface: "{{ this.json.interface }}"
+        routing: "{{ this.json.routing }}"
 
     #
-    # Create the iproute file
+    # Verify that the required fields are present "network and interface"
     #
-    - name: Create empty iproute file ( if non existing )
+    - name: Verify that network and interface is included in the config
+      assert:
+        that:
+          - network | length > 0
+          - interface | length > 0
+        quiet: true
+
+    #
+    # We do not update the primary interface
+    #
+    - name: >
+            "Check if we are trying to update primary interface
+             {{ ansible_facts.default_ipv4.interface }}"
+      fail:
+        msg: >
+            "Not allowed to change primary interface
+             {{ ansible_facts.default_ipv4.interface }}"
+      when: ansible_facts.default_ipv4.interface == interface
+
+    #
+    # Check if type is defined in facts, i.e. the interface exists
+    #
+    - name: "Get network type for interface {{ interface }}"
+      set_fact:
+        network_type: "{{ ansible_facts[interface]['type'] | default(omit) }}"
+
+    #
+    # Check if network_type is defined
+    #
+    - name: "Check if {{ interface }} is a network interface"
+      fail:
+        msg: "{{ interface }} is not a valid network interface"
+      when: network_type is not defined
+
+    #
+    # Check if interface is in drop zone
+    #
+    - name: "Check if interface {{ interface }} is in drop zone"
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/firewall-cmd
+          - --list-interfaces
+          - --zone=drop
+      register: indropzone
+      changed_when: false
+
+    - block:
+
+        #
+        # Move lab interface to drop zone
+        #
+        - name: "Move interface {{ interface }} to drop zone"
+          ansible.builtin.command:
+            argv:
+              - /usr/bin/firewall-cmd
+              - "--change-interface={{ interface }}"
+              - --permanent
+              - --zone=drop
+
+        #
+        # Reload firewalld
+        #
+        - name: Reload firewalld
+          ansible.builtin.command:
+            argv:
+              - /usr/bin/firewall-cmd
+              - --reload
+
+      when: not ( indropzone.stdout | regex_search(interface) )
+
+
+    #
+    # Check if primary interface is in dmz zone
+    #
+    - name: >
+         "Check if interface {{ ansible_facts.default_ipv4.interface }}
+          is in dmz zone"
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/firewall-cmd
+          - --list-interfaces
+          - --zone=dmz
+      register: indmzzone
+      changed_when: false
+
+    - block:
+
+        #
+        # Move primary interface to dmz zone
+        #
+        - name: >
+             "Move interface {{ ansible_facts.default_ipv4.interface }}
+             to drop zone"
+          ansible.builtin.command:
+            argv:
+              - /usr/bin/firewall-cmd
+              - "--change-interface={{ ansible_facts.default_ipv4.interface }}"
+              - --permanent
+              - --zone=dmz
+
+        #
+        # Reload firewalld
+        #
+        - name: Reload firewalld
+          ansible.builtin.command:
+            argv:
+              - /usr/bin/firewall-cmd
+              - --reload
+
+      when: not ( indmzzone.stdout
+              | regex_search(ansible_facts.default_ipv4.interface) )
+
+    #
+    # Verify network address is ok
+    #
+    # ( network | regex_search('^[0-9]+.[0-9]+.[0-9]+.[0-9]+\\/[0-9]+$') )
+    - name: "Validate network address {{ network }} is valid"
+      fail:
+        msg: "The ip address {{ network  }} is not valid"
+      when: not ( network | regex_search('^\d+.\d+.\d+.\d+\\/\d+$') )
+
+    - name: Configure network interface ip address
+      community.general.nmcli:
+        conn_name: "{{ interface }}"
+        ifname: "{{ interface }}"
+        type: ethernet
+        ip4: "{{ network }}"
+        state: present
+      register: net
+
+    #
+    # Routing
+    #
+    - block:
+
+        #
+        # Validate routing content
+        #
+        # when: not ( routing | regex_search('^[0-9]+.[0-9]+.[0-9]+.[0-9]+\\
+        # /[0-9]+ +[0-9]+.[0-9]+.[0-9]+.[0-9]+$'))
+        - name: "Validate routing {{ routing }} is valid"
+          fail:
+            msg: "The routing {{ routing  }} is not valid"
+          when: not ( routing |
+                regex_search('^\d+\.\d+\.\d+\.\d+\\/\d+\s+\d+\.\d+\.\d+\.\d+$'))
+
+        #
+        # Dont allow update default route
+        #
+        - name: "Validate routing {{ routing }} not overwriting default router"
+          fail:
+            msg: "The routing {{ routing  }} is not valid"
+          when: ( routing | regex_search('^0.0.0.0') )
+
+        #
+        # Extract network and gateway
+        #
+        - name: Define destination network and router
+          set_fact:
+            remote_network: "{{ routing.split(' ')[0] }}"
+            remote_router: "{{ routing.split(' ')[1] }}"
+            iproutefile: "/etc/sysconfig/network-scripts/route-{{ interface }}"
+
+        #
+        # Create the iproute file
+        #
+        - name: Create empty iproute file ( if non existing )
+          copy:
+            content: "{{ remote_network }} via {{ remote_router }}"
+            dest: "{{ iproutefile }}"
+            force: false
+
+        #
+        # Update the route-interface file
+        #
+        - name: "Update ip route file {{ iproutefile }}"
+          ansible.builtin.template:
+            src: /root/iproute-template.j2
+            dest: "{{ iproutefile }}"
+          register: route
+
+      when: routing | length > 0
+
+    - block:
+
+        - name: "Bring down the interface {{ interface }}"
+          command: "/usr/sbin/ifdown {{ interface }}"
+          register: down
+
+        - name: "Bring up the interface {{ interface }}"
+          command: "/usr/sbin/ifup {{ interface }}"
+          register: up
+
+      when: ( net.changed is defined and net.changed == true ) or
+            ( route.changed is defined and route.changed == true )
+
+    #
+    # Update local cache, to later check update dates
+    #
+    - name: Update localchange if new config
       copy:
-        content: "{{ remote_network }} via {{ remote_router }}"
-        dest: "{{ iproutefile }}"
-        force: no
-
-    #
-    # Update the route-interface file
-    #
-    - name: "Update ip route file {{ iproutefile }}"
-      ansible.builtin.template:
-        src: /root/iproute-template.j2
-        dest: "{{ iproutefile }}"
-      register: route
-    
-      #- name: "Update ip route file {{ iproutefile }}"
-      #ansible.builtin.lineinfile:
-      #  path: "{{ iproutefile }}"
-      #  line: "{{ remote_network }} via {{ remote_router }}"
-      #register: route
-
-    when: routing | length > 0
-
-  - block:
-
-    - name: "Bring down the interface {{ interface }}"
-      command: "/usr/sbin/ifdown {{ interface }}"
-      register: down
-
-    - name: "Bring up the interface {{ interface }}"
-      command: "/usr/sbin/ifup {{ interface }}"
-      register: up
-
-    when: ( net.changed is defined and net.changed == true ) or
-          ( route.changed is defined and route.changed == true )
+        content: "{{ this.json }}"
+        dest: "{{ localchange }}"
+      register: update
+      when: ( st.stat.mtime is not defined ) or
+            ( this.json.mtime|int > st.stat.mtime|int )
