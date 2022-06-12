@@ -22,8 +22,25 @@
           - ansible-collection-community-general
           - ansible-collection-ansible-posix.noarch
           - vim
+          - firewalld 
+          - NetworkManager 
           #- git
         state: present
+
+    - name: enable and start firewalld service
+      systemd:
+        enabled: yes
+        state: started
+        daemon_reload: yes
+        name: firewalld.service
+
+    - name: enable and start NetworkManager service
+      systemd:
+        enabled: yes
+        state: started
+        daemon_reload: yes
+        name: NetworkManager.service
+
 
     - name: install network playbook
       copy:
