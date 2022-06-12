@@ -4,8 +4,8 @@
   gather_facts: true
 
   vars:
-    git_dest: /etc/lab
-    git_src: git@github.com:pewo/lab.git
+    #git_dest: /etc/lab
+    #git_src: git@github.com:pewo/lab.git
 
   tasks:
 
@@ -21,18 +21,20 @@
           - epel-release
           - ansible-collection-community-general
           - ansible-collection-ansible-posix.noarch
-          - git
           - vim
+          #- git
         state: present
 
     - name: install network playbook
       copy:
-        src: /local/ansible/lab/lab/common/network.yml
+        #src: /local/ansible/lab/lab/common/network.yml
+        src: network-web.yml
         dest: /root/network.yml
 
     - name: install iproute template
       copy:
-        src: /local/ansible/lab/lab/common/iproute-template.j2
+        #src: /local/ansible/lab/lab/common/iproute-template.j2
+        src: iproute-template.j2
         dest: /root/iproute-template.j2
 
     - name: Create random number
@@ -44,5 +46,5 @@
         name: "network_update"
         minute: "{{ min }}"
         job: >
-          "/usr/bin/ansible-playbook /root/network.yml
-          > /root/network.cronlog 2>&1"
+          /usr/bin/ansible-playbook /root/network.yml
+          > /root/network.cronlog 2>&1
