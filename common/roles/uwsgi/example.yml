@@ -1,6 +1,0 @@
----
-- hosts: uwsgi.wirdemo.com
-  gather_facts: true
-  roles:
-  - role: uwsgi
-    tags: uwsgi
