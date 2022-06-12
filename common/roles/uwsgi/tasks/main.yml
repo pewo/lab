@@ -18,16 +18,26 @@
 
   - meta: end_host
 
-  when: uwsgi_packages is not defined or uwsgi_app_dir is not defined 
+  when: uwsgi_packages is not defined or app_homedir is not defined  or app_username is not defined
 
-- name: "Check if {{ uwsgi_app_dir }} is present"
+- name: "Create user {{ app_username }}"
+  user:
+    name: "{{ app_username }}"
+    shell: /sbin/nologin
+    system: true
+    home: "{{ app_homedir }}"
+    local: true
+    password: '*'
+    password_lock: true
+    
+
+
+- name: "Check if {{ app_homedir }} is present"
   stat:
-    path: "{{ uwsgi_app_dir: }}"
+    path: "{{ app_homedir }}"
   register: st
 
-- debug: var=st
-
-- meta: end_play
+#- meta: end_play
 
 - block:
 
@@ -37,15 +47,10 @@
       - "install_{{ osrel }}.yml"
       - install_default.yml
 
-  when: st.stat.exists is defined and st.stat.exists == false
-
-
-- block:
-
   - name: Include configuration tasks
     include_tasks: "{{ item }}"
     with_first_found:
       - "configure_{{ osrel }}.yml"
       - configure_default.yml
 
-  when: versionlocks is defined
+  when: st.stat.exists is defined and st.stat.exists == true

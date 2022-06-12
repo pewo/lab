@@ -1,7 +1,40 @@
 ---
 
-- name: install versionlock packages
+- name: install epel-release
   yum:
-    name: "{{ versionlock_packages }}" 
+    name: epel-release
+  register: epel
+  when: uwsgi_packages is defined
+
+- name: install uwsgi packages
+  yum:
+    name: "{{ uwsgi_packages }}" 
   register: packages
-  when: versionlock_packages is defined
+  when: uwsgi_packages is defined
+
+- name: copy app files
+  copy:
+    src: files/
+    dest: "{{ app_homedir }}"
+    mode: u=rwx,g=rx,o=rx
+
+    #- name: copy uwsgi systemd file
+    #  copy:
+    #src: uwsgi.service
+    #dest: /etc/systemd/system/uwsgi.service
+
+- name: copy uwsgi startup script
+  template:
+    src: labconf.sh.j2
+    dest: "{{ app_homedir }}/labconf.sh"
+    owner: root
+    mode: '0655'
+
+
+- name: copy uwsgi systemd file
+  template:
+    src: labconf.service.j2
+    dest: /etc/systemd/system/labconf.service
+    owner: root
+    mode: '0644'
+

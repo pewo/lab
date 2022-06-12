@@ -1,0 +1,9 @@
+#!/bin/sh
+
+cd {{ app_homedir }}
+
+if [ ! -d {{ app_homedir }} ]; then
+	exit 1
+fi
+
+/sbin/uwsgi --uid {{ app_username }} --plugin python3 --http-socket {{ app_bindaddr }}:{{ app_tcpport }} --wsgi-file uwsgi.py --processes 10 --threads 2

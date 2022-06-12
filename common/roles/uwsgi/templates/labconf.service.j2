@@ -1,0 +1,11 @@
+[Unit]
+Description=Labconf Service
+After=network.target 
+
+[Service]
+Restart=always
+ExecStart={{ app_homedir }}/labconf.sh 
+ExecStop=/usr/bin/pkill -u {{ app_username }}
+
+[Install]
+WantedBy=multi-user.target

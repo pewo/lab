@@ -1,1 +1,5 @@
 ---
+app_username: labconf
+app_homedir: /local/labconf
+app_tcpport: 5000
+app_bindaddr: 0.0.0.0
