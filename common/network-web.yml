@@ -4,8 +4,8 @@
   gather_facts: false
 
   vars:
-    git_dest: /etc/lab
-    git_src: git@github.com:pewo/lab.git
+    #git_dest: /etc/lab
+    #git_src: git@github.com:pewo/lab.git
     localchange: /root/labconf.latest
 
   tasks:
@@ -13,9 +13,9 @@
   #
   # Get config from web server
   #
-  - name: Check that a page returns a status 200 and fail if the word AWESOME is not in the page contents
+  - name: Get labconf data
     uri:
-      url: http://podman1:8443/test
+      url: http://uwsgi:5000/
       return_content: yes
       body_format: json
     register: this
