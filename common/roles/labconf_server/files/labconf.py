@@ -55,12 +55,23 @@ def labconf(ip_address):
         line_no = 0
         for line in f:
             line_no += 1
-            #print("line(", line_no, "): ", line.strip())
-            key, value = line.strip().split(":", 2)
+            # print("line(", line_no, "): ", line.strip())
+
+            # Remove comments
+            line = line.split("#", 1)[0]
+
+            # key, value = line.strip().split(":", 2)
+            mylist = line.strip().split(":", 2)
+
+            if len(mylist) < 2:
+                print("Bad line on line", line_no)
+                continue
+
+            key, value = mylist
             if key:
                 key = key.rstrip().lstrip()
             else:
-                print("Bad key on line", lineno)
+                print("Bad key on line", line_no)
                 continue
 
             if value:
@@ -68,6 +79,7 @@ def labconf(ip_address):
             else:
                 print("Bad value on line", line_no)
                 continue
+
             myjson[key] = value
         f.close()
 
@@ -91,24 +103,14 @@ def home():
         print("Refreshing labconf")
         try:
             subprocess.call(["/usr/bin/git", "-C", ROOT, "pull"])
-            subprocess.call(["/usr/bin/ls", "-la"])
         except Exception as e:
             print("Error updating labconf, error:", e)
         else:
             print("Updating labconf ok")
 
-    #for k, v in os.environ.items():
-    #   str += k + "=" + v + "<BR>"
-    #str += pprint.pformat(request.environ, depth=5) + '<BR><BR>'
-    #str += pprint.pformat(request.headers, depth=5) + '<BR><BR>'
-    #str += pprint.pformat(request.remote_addr, depth=5) + '<BR><BR>'
-    #str += pprint.pformat(resolve_ip(request.remote_addr), depth=5) + '<BR><BR>'
-    #str += pprint.pformat(labconf(request.remote_addr), depth=5)
     myjson = labconf(request.remote_addr)
     res = json.dumps(myjson)
-    #return Response(str, mimetype="text/text")
     return Response(res)
-    #return(str)
 
 if __name__ == "__main__":
     #PORT = 8443
