@@ -44,6 +44,22 @@
         path: "{{ localchange }}"
       register: st
 
+
+    - block:
+
+        - name: "Parse localchange file {{ localchange }}"
+          set_fact:
+             localjson: "{{ lookup('file', localchange ) | from_json }}"
+          ignore_errors: true
+
+        - name: "Locate mtime in localchange file"
+          set_fact:
+             localmtime: "{{ localjson.mtime | int }}"
+          when: localjson.mtime is defined
+
+      when: st.stat.exists is defined and st.stat.exists
+
+    - debug: var=localjson.mtime,this.json.mtime
     #
     # End playbook if repo is unchanged
     #
@@ -54,8 +70,8 @@
 
         - meta: end_play
 
-      when: ( st.stat.mtime is defined ) and
-            ( this.json.mtime|int < st.stat.mtime|int )
+      when: ( localmtime is defined ) and
+            ( this.json.mtime|int <= localmtime |int )
 
     #
     # Get some facts
@@ -65,11 +81,20 @@
         gather_subset:
           - network
 
-    - name: Save facts in local variables
+    - name: Save network config in local variable
       set_fact:
         network: "{{ this.json.network }}"
+      when: this.json.network is defined
+
+    - name: Save interface config in local variable
+      set_fact:
         interface: "{{ this.json.interface }}"
+      when: this.json.interface is defined
+
+    - name: Save routing config in local variable
+      set_fact:
         routing: "{{ this.json.routing }}"
+      when: this.json.routing is defined
 
     #
     # Verify that the required fields are present "network and interface"
@@ -217,8 +242,7 @@
         - name: "Validate routing {{ routing }} is valid"
           fail:
             msg: "The routing {{ routing  }} is not valid"
-          when: not ( routing |
-                regex_search('^\d+\.\d+\.\d+\.\d+\\/\d+\s+\d+\.\d+\.\d+\.\d+$'))
+          when: not ( routing | regex_search('^\d+\.\d+\.\d+\.\d+\\/\d+\s+\d+\.\d+\.\d+\.\d+$'))
 
         #
         # Dont allow update default route
@@ -255,7 +279,7 @@
             dest: "{{ iproutefile }}"
           register: route
 
-      when: routing | length > 0
+      when: routing is defined and routing | length > 0
 
     - block:
 
@@ -275,8 +299,8 @@
     #
     - name: Update localchange if new config
       copy:
-        content: "{{ this.json }}"
+        content: "{{ this.json | to_nice_json }}"
         dest: "{{ localchange }}"
       register: update
-      when: ( st.stat.mtime is not defined ) or
-            ( this.json.mtime|int > st.stat.mtime|int )
+      when: ( localmtime is not defined ) or
+            ( this.json.mtime|int > localmtime|int )
