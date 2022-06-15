@@ -37,6 +37,15 @@
       when: ( this.json.mtime is not defined )
 
     #
+    # Remove local cache file when force is defined
+    #
+    - name: Remove local cache when enforced
+      file:
+         path: "{{ localchange }}"
+         state: absent
+      when: force is defined 
+
+    #
     # Check if localchange exists
     #
     - name: "Check localchange file {{ localchange }}"
@@ -59,7 +68,6 @@
 
       when: st.stat.exists is defined and st.stat.exists
 
-    - debug: var=localjson.mtime,this.json.mtime
     #
     # End playbook if repo is unchanged
     #
