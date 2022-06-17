@@ -5,6 +5,7 @@
 
   vars:
     localchange: /root/labconf.latest
+    access_conf: /etc/security/access.conf
 
   tasks:
 
@@ -41,9 +42,9 @@
     #
     - name: Remove local cache when enforced
       file:
-         path: "{{ localchange }}"
-         state: absent
-      when: force is defined 
+        path: "{{ localchange }}"
+        state: absent
+      when: force is defined
 
     #
     # Check if localchange exists
@@ -58,12 +59,12 @@
 
         - name: "Parse localchange file {{ localchange }}"
           set_fact:
-             localjson: "{{ lookup('file', localchange ) | from_json }}"
+            localjson: "{{ lookup('file', localchange ) | from_json }}"
           ignore_errors: true
 
         - name: "Locate mtime in localchange file"
           set_fact:
-             localmtime: "{{ localjson.mtime | int }}"
+            localmtime: "{{ localjson.mtime | int }}"
           when: localjson.mtime is defined
 
       when: st.stat.exists is defined and st.stat.exists
@@ -103,6 +104,11 @@
       set_fact:
         routing: "{{ this.json.routing }}"
       when: this.json.routing is defined
+
+    - name: Save access config in local variable
+      set_fact:
+        access: "{{ this.json.access }}"
+      when: this.json.access is defined
 
     #
     # Verify that the required fields are present "network and interface"
@@ -301,6 +307,43 @@
 
       when: ( net.changed is defined and net.changed == true ) or
             ( route.changed is defined and route.changed == true )
+
+    - block:
+
+        - name: "Add root to {{ access_conf }}"
+          lineinfile:
+            path: "{{ access_conf }}"
+            line: "+:root:ALL"
+            backup: false
+
+        - name: "Add access to {{ access_conf }}"
+          lineinfile:
+            path: "{{ access_conf }}"
+            line: "+:{{ access }}:ALL"
+            backup: false
+          register: useradded
+
+        - name: "Block all other in {{ access_conf }}"
+          lineinfile:
+            path: "{{ access_conf }}"
+            line: "-:ALL:ALL"
+            backup: false
+          when: useradded.changed is defined and useradded.changed
+
+        - name: "Enable pam_access"
+          command:
+            cmd: /usr/bin/authselect selec sssd with-pamaccess
+          failed_when: false
+          changed_when: false
+
+      when: ( access is defined )
+
+    - name: "Remove access config"
+      lineinfile:
+        dest: "{{ access_conf }}"
+        regexp: '^(?!#)'
+        state: absent
+      when: ( access is not defined )
 
     #
     # Update local cache, to later check update dates
