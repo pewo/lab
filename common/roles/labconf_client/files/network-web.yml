@@ -6,7 +6,7 @@
   vars:
     localchange: /root/labconf.latest
     access_conf: /etc/security/access.conf
-
+    chrony_conf: /etc/chrony.conf
   tasks:
 
     #
@@ -109,6 +109,11 @@
       set_fact:
         access: "{{ this.json.access }}"
       when: this.json.access is defined
+
+    - name: Save ntp config in local variable
+      set_fact:
+        ntp: "{{ this.json.ntp }}"
+      when: this.json.ntp is defined
 
     #
     # Verify that the required fields are present "network and interface"
@@ -295,6 +300,67 @@
 
       when: routing is defined and routing | length > 0
 
+      #
+      # NTP
+      #
+    - block:
+        #
+        # allow chrony to receive and answer ntp querys from clients
+        #
+        - name: Configure chrony to accept ntp requests
+          lineinfile:
+            path: "{{ chrony_conf }}"
+            regexp: 'allow\s+'
+            line: "allow all"
+            backup: false
+          register: ntp_changed
+          notify: Restart chronyd
+
+        #
+        # Add ntp service to drop zone
+        #
+        - name: "Add ntp service to drop zone"
+          ansible.builtin.command:
+            argv:
+              - /usr/bin/firewall-cmd
+              - --add-service=ntp
+              - --permanent
+              - --zone=drop
+          notify: Reload firewalld
+
+      when: ( ntp is defined and ntp )
+
+      #
+      # NTP ( when not configured )
+      #
+
+    - block:
+
+        #
+        # disable chrony to receive and answer ntp querys from clients
+        #
+        - name: Configure chrony to not accept ntp requests
+          lineinfile:
+            path: "{{ chrony_conf }}"
+            regexp: 'allow\s+'
+            line: "#allow all"
+            backup: false
+          notify: Restart chronyd
+
+        #
+        # remove ntp service to drop zone
+        #
+        - name: "Remove ntp service from drop zone"
+          ansible.builtin.command:
+            argv:
+              - /usr/bin/firewall-cmd
+              - --remove-service=ntp
+              - --permanent
+              - --zone=drop
+          notify: Reload firewalld
+
+      when: ( ntp is not defined )
+     
     - block:
 
         - name: "Bring down the interface {{ interface }}"
@@ -355,3 +421,23 @@
       register: update
       when: ( localmtime is not defined ) or
             ( this.json.mtime|int > localmtime|int )
+
+  handlers:
+    #
+    # Reload firewalld
+    #
+    - name: Reload firewalld
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/firewall-cmd
+          - --reload
+
+    #
+    # Restart chrony if config changed
+    #
+    - name: Restart chronyd 
+      service:
+        name: chronyd
+        state: restarted
+
+

@@ -9,13 +9,11 @@
 - name: install required packages
   package:
     name:
-      - epel-release
       - ansible-collection-community-general
       - ansible-collection-ansible-posix.noarch
       - vim
       - firewalld
       - NetworkManager
-      # - git
     state: present
 
 - name: enable and start firewalld service
@@ -35,13 +33,11 @@
 
 - name: install network playbook
   copy:
-    # src: /local/ansible/lab/lab/common/network.yml
     src: network-web.yml
     dest: /root/network.yml
 
 - name: install iproute template
   copy:
-    # src: /local/ansible/lab/lab/common/iproute-template.j2
     src: iproute-template.j2
     dest: /root/iproute-template.j2
 
