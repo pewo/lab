@@ -3,4 +3,4 @@ network: 10.0.0.128/24
 #routing: 192.168.100.0/24 10.0.0.1
 #access: peter
 description: Testing
-ntp: false
+ntp: true
