@@ -4,7 +4,7 @@
   gather_facts: false
 
   vars:
-    localchange: /root/labconf.latest
+    localchange: /dev/shm/labconf.latest
     access_conf: /etc/security/access.conf
     chrony_conf: /etc/chrony.conf
   tasks:
@@ -229,6 +229,18 @@
 
       when: not ( indmzzone.stdout
               | regex_search(ansible_facts.default_ipv4.interface) )
+
+    #
+    # Add ntp service to drop zone
+    #
+    - name: "Add ftp service to drop zone"
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/firewall-cmd
+          - --add-service=ftp
+          - --permanent
+          - --zone=drop
+      notify: Reload firewalld
 
     #
     # Verify network address is ok

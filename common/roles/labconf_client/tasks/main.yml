@@ -14,6 +14,7 @@
       - vim
       - firewalld
       - NetworkManager
+      - vsftpd
     state: present
 
 - name: enable and start firewalld service
@@ -22,6 +23,13 @@
     state: started
     daemon_reload: true
     name: firewalld.service
+
+- name: enable and start vsftpd service
+  systemd:
+    enabled: true
+    state: started
+    daemon_reload: true
+    name: vsftpd.service
 
 - name: enable and start NetworkManager service
   systemd:
@@ -52,3 +60,17 @@
     job: >
       /usr/bin/ansible-playbook /root/network.yml
       > /root/network.cronlog 2>&1
+
+- name: Chown /var/ftp/pub
+  file:
+    path: /var/ftp/pub
+    owner: ftp
+    group: ftp
+    state: directory
+    mode: 'u=rwx,g=rx,o=rx'
+
+- name: Update vsftpd.conf
+  copy:
+    src: vsftpd.conf
+    dest: /etc/vsftpd/vsftpd.conf
+  notify: Restart vsftpd

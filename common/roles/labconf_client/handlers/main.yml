@@ -1,0 +1,9 @@
+---
+
+#
+# Restart vsftpd if config changed
+#
+- name: Restart vsftpd 
+  service:
+    name: vsftpd
+    state: restarted
