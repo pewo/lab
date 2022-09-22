@@ -74,3 +74,22 @@
     src: vsftpd.conf
     dest: /etc/vsftpd/vsftpd.conf
   notify: Restart vsftpd
+
+- name: Set correct fcontext on /var/ftp/pub
+  sefcontex:
+    target: '/var/ftp/pub(/.*)?'
+    setype: public_content_rw_t
+    state: present
+
+- name: restoreconf /var/ftp/pub
+  command: "/usr/sbin/restorecon -irv /var/ftp/pub"
+  failed_when: false
+  changed_when: false
+
+- name: Set ftpd_anon_write flag on and keep it persistant across reboots
+  seboolean:
+    name: ftpd_anon_write
+    state: yes
+    persistant: yes
+
+

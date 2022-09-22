@@ -6,3 +6,5 @@
   roles:
     - role: labconf_client
       tags: labconf_client
+      vars:
+        uwsgi_url: 'http://uwsgi:5000/'
