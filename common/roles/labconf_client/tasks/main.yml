@@ -11,6 +11,7 @@
     name:
       - ansible-collection-community-general
       - ansible-collection-ansible-posix.noarch
+      - python3-policycoreutils
       - vim
       - firewalld
       - NetworkManager
@@ -24,20 +25,12 @@
     daemon_reload: true
     name: firewalld.service
 
-- name: enable and start vsftpd service
-  systemd:
-    enabled: true
-    state: started
-    daemon_reload: true
-    name: vsftpd.service
-
 - name: enable and start NetworkManager service
   systemd:
     enabled: true
     state: started
     daemon_reload: true
     name: NetworkManager.service
-
 
 - name: install network playbook
   copy:
@@ -49,6 +42,11 @@
     src: iproute-template.j2
     dest: /root/iproute-template.j2
 
+- name: install thinlinc_secure playbook
+  copy:
+    src: thinlinc_secure.yml
+    dest: /root/thinlinc_secure.yml
+
 - name: Create random number
   set_fact:
     min: "{{ 59 |random(seed=inventory_hostname) }}"
@@ -58,7 +56,7 @@
     name: "network_update"
     minute: "{{ min }}"
     job: >
-      /usr/bin/ansible-playbook /root/network.yml
+      /usr/bin/ansible-playbook /root/network.yml /root/thinlinc_secure.yml
       > /root/network.cronlog 2>&1
 
 - name: Chown /var/ftp/pub
@@ -73,23 +71,36 @@
   copy:
     src: vsftpd.conf
     dest: /etc/vsftpd/vsftpd.conf
-  notify: Restart vsftpd
+    #notify: Restart vsftpd
 
-- name: Set correct fcontext on /var/ftp/pub
-  sefcontex:
-    target: '/var/ftp/pub(/.*)?'
-    setype: public_content_rw_t
-    state: present
+- name: Check getenforce
+  stat:
+    path: /usr/sbin/getenforce
+  register: getenforce
 
-- name: restoreconf /var/ftp/pub
-  command: "/usr/sbin/restorecon -irv /var/ftp/pub"
-  failed_when: false
-  changed_when: false
-
-- name: Set ftpd_anon_write flag on and keep it persistant across reboots
-  seboolean:
-    name: ftpd_anon_write
-    state: yes
-    persistant: yes
+- name: check SElinux status
+  command: "{{ getenforce.stat.path }}"
+  register: sestatus
+  when: getenforce is defined and getenforce.stat.exists
 
 
+- block:
+
+  - name: Set correct fcontext on /var/ftp/pub
+    sefcontext:
+      target: '/var/ftp/pub(/.*)?'
+      setype: public_content_rw_t
+      state: present
+
+  - name: restoreconf /var/ftp/pub
+    command: "/usr/sbin/restorecon -irv /var/ftp/pub"
+    failed_when: false
+    changed_when: false
+
+  - name: Set ftpd_anon_write flag on and keep it persistant across reboots
+    seboolean:
+      name: ftpd_anon_write
+      state: yes
+      persistent: yes
+
+  when: sestatus is defined and sestatus.stdout != 'Disabled'

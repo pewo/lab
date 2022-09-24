@@ -1,0 +1,70 @@
+---
+- hosts: localhost
+  gather_facts: false
+
+  tasks:
+
+  - name: check if tl-mount-personal exists
+    stat:
+      path: /opt/thinlinc/libexec/tl-mount-personal
+    register: personal
+
+  - name: Remove suid
+    file:
+      path: "{{ personal.stat.path }}"
+      mode: 0000
+    when: personal is defined and personal.stat.exists and personal.stat.isuid
+
+  - name: check if vsmagent.conf exists
+    stat:
+      path: /opt/thinlinc/etc/conf.d/vsmagent.hconf
+    register: vsmconf
+
+  - block: 
+
+    - name: Update xserver config
+      replace:
+         path: "{{ vsmconf.stat.path }}"
+         regexp: '^xserver_args=.*'
+         replace: 'xserver_args=-br -localhost -verbose 3 -noclipboard -AcceptCutText=0 -SendCutText=0'
+         backup: true
+      notify: Restart vsmagent
+      when:  vsmconf is defined and vsmconf.stat.exists 
+
+    - name: check if we have sshd_config
+      stat:
+        path: /etc/ssh/sshd_config
+      register: sshd_config
+
+    - name: Insert user block in /etc/ssh/sshd_config
+      ansible.builtin.blockinfile:
+        path: "{{ sshd_config.stat.path }}"
+        block: |
+          Match User *,!root
+            GatewayPorts no
+            PermitOpen 127.0.0.1:*
+            AllowTcpForwarding local
+            ForceCommand /opt/thinlinc/libexec/thinlinc-login
+        validate: /usr/sbin/sshd -T -f %s
+        insertafter: EOF
+      notify: Restart sshd
+      when: sshd_config is defined and sshd_config.stat.exists
+
+    when: vsmconf is defined and vsmconf.stat.exists
+
+  handlers:
+    #
+    # Reload vsmagent
+    #
+    - name: Restart vsmagent
+      service:
+        name: vsmagent
+        state: restarted
+        
+    #
+    # Reload sshd
+    #
+    - name: Restart sshd
+      service:
+        name: sshd
+        state: restarted

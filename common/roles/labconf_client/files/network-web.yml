@@ -110,6 +110,11 @@
         access: "{{ this.json.access }}"
       when: this.json.access is defined
 
+    - name: Save ftp config in local variable
+      set_fact:
+        ftp: "{{ this.json.ftp }}"
+      when: this.json.ftp is defined
+
     - name: Save ntp config in local variable
       set_fact:
         ntp: "{{ this.json.ntp }}"
@@ -230,17 +235,6 @@
       when: not ( indmzzone.stdout
               | regex_search(ansible_facts.default_ipv4.interface) )
 
-    #
-    # Add ntp service to drop zone
-    #
-    - name: "Add ftp service to drop zone"
-      ansible.builtin.command:
-        argv:
-          - /usr/bin/firewall-cmd
-          - --add-service=ftp
-          - --permanent
-          - --zone=drop
-      notify: Reload firewalld
 
     #
     # Verify network address is ok
@@ -311,6 +305,59 @@
           register: route
 
       when: routing is defined and routing | length > 0
+
+      #
+      # FTP
+      #
+    - block:
+      #
+      # enable vsftp service
+      #
+      - name: enable and start vsftpd service
+        systemd:
+          enabled: true
+          state: started
+          daemon_reload: true
+          masked: no
+          name: vsftpd.service
+
+      #
+      # Add ftp service to drop zone
+      #
+      - name: "Add ftp service to drop zone"
+        ansible.builtin.command:
+          argv:
+            - /usr/bin/firewall-cmd
+            - --add-service=ftp
+            - --permanent
+            - --zone=drop
+        notify: Reload firewalld
+
+      when: ( ftp is defined and ftp )
+
+    - block:
+      #
+      # disable vsftp service
+      #
+      - name: disable and stop vsftpd service
+        systemd:
+          enabled: false
+          state: stopped
+          daemon_reload: true
+          masked: yes
+          name: vsftpd.service
+      #
+      # Remove ftp service to drop zone
+      #
+      - name: "Remove ftp service to drop zone"
+        ansible.builtin.command:
+          argv:
+            - /usr/bin/firewall-cmd
+            - --remove-service=ftp
+            - --permanent
+            - --zone=drop
+
+      when: ( ftp is not defined )
 
       #
       # NTP

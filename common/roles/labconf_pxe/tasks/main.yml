@@ -1,0 +1,39 @@
+---
+
+- name: install packages
+  package:
+    name:
+      - dnsmasq
+      - dnsmasq-utils
+      - vim
+    state: present
+
+- name: enable and start vsftpd service
+  systemd:
+    enabled: true
+    state: started
+    daemon_reload: true
+    name: dnsmasq.service
+
+- name: disable and stop firewalld service
+  systemd:
+    enabled: false
+    state: stoped
+    name: firewalld.service
+
+    #      - firewalld
+    #  - NetworkManager
+    #  - vsftpd
+
+    #- name: enable and start NetworkManager service
+    #  systemd:
+    #enabled: true
+    #state: started
+    #daemon_reload: true
+    #name: NetworkManager.service
+
+    #- name: Update vsftpd.conf
+    #copy:
+    #src: vsftpd.conf
+    #dest: /etc/vsftpd/vsftpd.conf
+    #notify: Restart vsftpd
