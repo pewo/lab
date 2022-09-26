@@ -7,13 +7,35 @@
   - name: check if tl-mount-personal exists
     stat:
       path: /opt/thinlinc/libexec/tl-mount-personal
-    register: personal
+    register: pers_mount
 
   - name: Remove suid
     file:
-      path: "{{ personal.stat.path }}"
+      path: "{{ pers_mount.stat.path }}"
       mode: 0000
-    when: personal is defined and personal.stat.exists and personal.stat.isuid
+    when: pers_mount is defined and pers_mount.stat.exists 
+
+  - name: check if tl-umount-personal exists
+    stat:
+      path: /opt/thinlinc/libexec/tl-umount-personal
+    register: pers_umount
+
+  - name: Remove suid
+    file:
+      path: "{{ pers_umount.stat.path }}"
+      mode: 0000
+    when: pers_umount is defined and pers_umount.stat.exists 
+
+  - name: check if 40-tl-mount-localdrives exists
+    stat:
+      path: /opt/thinlinc/etc/xstartup.d/40-tl-mount-localdrives
+    register: mount_local
+
+  - name: Remove file
+    file:
+      path: "{{ mount_local.stat.path }}"
+      state: absent
+    when: mount_local is defined and mount_local.stat.exists 
 
   - name: check if vsmagent.conf exists
     stat:
@@ -26,7 +48,7 @@
       replace:
          path: "{{ vsmconf.stat.path }}"
          regexp: '^xserver_args=.*'
-         replace: 'xserver_args=-br -localhost -verbose 3 -noclipboard -AcceptCutText=0 -SendCutText=0'
+         replace: 'xserver_args=-br -nolisten tcp -localhost -verbose 3 -noclipboard -AcceptCutText=0 -SendCutText=0'
          backup: true
       notify: Restart vsmagent
       when:  vsmconf is defined and vsmconf.stat.exists 
