@@ -12,7 +12,7 @@
   - name: Remove suid
     file:
       path: "{{ pers_mount.stat.path }}"
-      mode: 0000
+      mode: u-s
     when: pers_mount is defined and pers_mount.stat.exists 
 
   - name: check if tl-umount-personal exists
@@ -23,7 +23,7 @@
   - name: Remove suid
     file:
       path: "{{ pers_umount.stat.path }}"
-      mode: 0000
+      mode: u-s
     when: pers_umount is defined and pers_umount.stat.exists 
 
   - name: check if 40-tl-mount-localdrives exists
@@ -37,6 +37,17 @@
       state: absent
     when: mount_local is defined and mount_local.stat.exists 
 
+  - name: check if cyclades-ser-cli exists
+    stat:
+      path: /opt/thinlinc/libexec/cyclades-ser-cli
+    register: cyclades
+
+  - name: Chmod file
+    file:
+      path: "{{ cyclades.stat.path }}"
+      mode: 0000
+    when: cyclades is defined and cyclades.stat.exists 
+
   - name: check if vsmagent.conf exists
     stat:
       path: /opt/thinlinc/etc/conf.d/vsmagent.hconf
@@ -44,13 +55,37 @@
 
   - block: 
 
-    - name: Update xserver config
-      replace:
-         path: "{{ vsmconf.stat.path }}"
-         regexp: '^xserver_args=.*'
-         replace: 'xserver_args=-br -nolisten tcp -localhost -verbose 3 -noclipboard -AcceptCutText=0 -SendCutText=0'
-         backup: true
-      notify: Restart vsmagent
+    - block:
+      - name: Update xserver config
+        replace:
+           path: "{{ vsmconf.stat.path }}"
+           regexp: '^xserver_args=.*'
+           replace: 'xserver_args=-br -nolisten tcp -localhost -verbose 3 -noclipboard -AcceptCutText=0 -SendCutText=0'
+           backup: true
+        notify: Restart vsmagent
+
+        #- name: activate syslog
+        #replace:
+        #   path: "{{ vsmconf.stat.path }}"
+        #   regexp: '^log_to_syslog=.*'
+        #   replace: 'log_to_syslog=1'
+        #   backup: true
+        #notify: Restart vsmagent
+        #
+        #- name: activate syslog destination
+        #replace:
+        #   path: "{{ vsmconf.stat.path }}"
+        #   regexp: '^syslog_host=.*'
+        #   replace: 'syslog_host=syslog'
+        #   backup: true
+        #notify: Restart vsmagent
+
+      - name: Create a symbolic link
+        file:
+          src: /opt/thinlinc/bin/tl-shadow-notify
+          dest: /opt/thinlinc/etc/xstartup.d/15-tl-shadow-notify
+          state: link
+
       when:  vsmconf is defined and vsmconf.stat.exists 
 
     - name: check if we have sshd_config
@@ -58,18 +93,45 @@
         path: /etc/ssh/sshd_config
       register: sshd_config
 
-    - name: Insert user block in /etc/ssh/sshd_config
-      ansible.builtin.blockinfile:
-        path: "{{ sshd_config.stat.path }}"
-        block: |
-          Match User *,!root
-            GatewayPorts no
-            PermitOpen 127.0.0.1:*
-            AllowTcpForwarding local
-            ForceCommand /opt/thinlinc/libexec/thinlinc-login
-        validate: /usr/sbin/sshd -T -f %s
-        insertafter: EOF
-      notify: Restart sshd
+    - block:
+      - name: Read sshd_cofig
+        slurp:
+          src: "{{ sshd_config.stat.path }}"
+        register: sshd_content
+
+      - set_fact:
+          content: "{{ sshd_content['content'] | b64decode }}"
+
+      - set_fact:
+          thinlinc_begin: true
+        when: '" @thinlinc-begin" in content'
+
+      - name: Insert thinlinc block in /etc/ssh/sshd_config
+        ansible.builtin.blockinfile:
+          path: "{{ sshd_config.stat.path }}"
+          marker: "# {mark} THINLINC1 ANSIBLE MANAGED BLOCK"
+          block: |
+            # @thinlinc-begin@
+            # @thinlinc-end@
+          validate: /usr/sbin/sshd -T -f %s
+          insertafter: EOF
+        notify: Restart sshd
+        when: not thinlinc_begin is defined
+
+      - name: Insert user block in /etc/ssh/sshd_config
+        ansible.builtin.blockinfile:
+          path: "{{ sshd_config.stat.path }}"
+          marker: "# {mark} THINLINC2 ANSIBLE MANAGED BLOCK"
+          block: |
+            Match User *,!root
+              GatewayPorts no
+              AllowTcpForwarding local
+              PermitOpen 127.0.0.1:22
+              ForceCommand /opt/thinlinc/libexec/thinlinc-login
+          validate: /usr/sbin/sshd -T -f %s
+          insertafter: EOF
+        notify: Restart sshd
+
       when: sshd_config is defined and sshd_config.stat.exists
 
     when: vsmconf is defined and vsmconf.stat.exists
