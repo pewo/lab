@@ -1,0 +1,9 @@
+---
+#
+# Role labconf_local - distribute local yml config file
+#
+- name: update /root/localconfig.yml
+  copy:
+    src: localconfig.yml
+    dst: /root/localconfig.yml
+    mode: 0755
