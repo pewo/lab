@@ -2,7 +2,19 @@
 - hosts: localhost
   gather_facts: false
 
+  vars_files:
+    - "bepa.yml"
+
+  vars:
+    localchange: /dev/shm/labconf.latest
+
   tasks:
+  - name: "Parse localchange file {{ localchange }}"
+    set_fact:
+      localjson: "{{ lookup('file', localchange) | from_json }}"
+    ignore_errors: true
+
+  - debug: var=localjson
 
   - name: check if tl-mount-personal exists
     stat:
@@ -123,7 +135,9 @@
           path: "{{ sshd_config.stat.path }}"
           marker: "# {mark} THINLINC2 ANSIBLE MANAGED BLOCK"
           block: |
-            Match User *,!root
+            AllowUsers root
+            Match group bepa
+              AllowUsers *
               GatewayPorts no
               AllowTcpForwarding local
               PermitOpen 127.0.0.1:22
